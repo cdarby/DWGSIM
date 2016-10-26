@@ -70,6 +70,17 @@ dwgsim_opt_t* dwgsim_opt_init()
   opt->fp_mut = opt->fp_bfast = opt->fp_bwa1 = opt->fp_bwa2 = NULL;
   opt->fp_fa = opt->fp_fai = NULL;
   opt->read_prefix = NULL;
+  
+  //ADDITIONS to toggle heterozygosity
+  /* int32_t ins_het;
+    int32_t del_het;
+    int32_t sub_het;
+    int32_t del_prob; */
+    
+  opt->ins_het = 0.333333;
+  opt->del_het = 0.333333;
+  opt->sub_het = 0.333333;
+  opt->del_prob = 0.5;
 
   return opt;
 }
@@ -138,6 +149,12 @@ int dwgsim_opt_usage(dwgsim_opt_t *opt)
   fprintf(stderr, "Note: For SOLiD mate pair reads and BFAST, the first read is F3 and the second is R3. For SOLiD mate pair reads\n");
   fprintf(stderr, "and BWA, the reads in the first file are R3 the reads annotated as the first read etc.\n");
   fprintf(stderr, "\n");
+  fprintf(stderr, "Customized options for heterozygosity (does not apply when bed file given) \n");
+  fprintf(stderr, "         -j FLOAT      fraction of insertions that are heterozygous [%.2f]\n", opt->ins_het);
+  fprintf(stderr, "         -k FLOAT      fraction of deletions that are heterozygous [%.2f]\n", opt->del_het);
+  fprintf(stderr, "         -t FLOAT      fraction of substitutions that are heterozygous [%.2f]\n", opt->sub_het);
+  fprintf(stderr, "         -w FLOAT      fraction of indels that are deletions [%.2f]\n", opt->del_prob);
+  fprintf(stderr, "\n");
   fprintf(stderr, "Note: The longest supported insertion is %u.\n", UINT32_MAX);
   fprintf(stderr, "\n");
   return 1;
@@ -189,7 +206,7 @@ dwgsim_opt_parse(dwgsim_opt_t *opt, int argc, char *argv[])
   int c;
   int muts_input_type = 0;
   
-  while ((c = getopt(argc, argv, "id:s:N:C:1:2:e:E:r:F:R:X:I:c:S:n:y:BHf:z:Mm:b:v:x:P:q:Q:h")) >= 0) {
+  while ((c = getopt(argc, argv, "id:s:N:C:1:2:e:E:r:F:R:X:I:c:S:n:y:BHf:z:Mm:b:v:x:P:q:Q:h:j:k:t:w")) >= 0) {
       switch (c) {
         case 'i': opt->is_inner = 1; break;
         case 'd': opt->dist = dwgsim_atoi(optarg, 'd'); break;
@@ -225,6 +242,11 @@ dwgsim_opt_parse(dwgsim_opt_t *opt, int argc, char *argv[])
         case 'P': free(opt->read_prefix); opt->read_prefix = strdup(optarg); break;
         case 'q': opt->fixed_quality = strdup(optarg); break;
         case 'Q': opt->quality_std = atof(optarg); break;
+        //customized heterozygosity options
+        case 'j': opt->ins_het = atof(optarg); break;
+        case 'k': opt->del_het = atof(optarg); break;
+        case 't': opt->sub_het = atof(optarg); break;
+        case 'w': opt->del_prob = atof(optarg); break;
         default: fprintf(stderr, "Unrecognized option: -%c\n", c); return 0;
       }
   }

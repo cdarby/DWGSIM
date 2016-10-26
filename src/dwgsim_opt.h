@@ -43,6 +43,13 @@ typedef struct {
     FILE *fp_fa;
     FILE *fp_fai;
     char *read_prefix;
+    
+    //ADDITIONS to toggle heterozygosity
+    double ins_het;
+    double del_het;
+    double sub_het;
+    double del_prob; //Pr of insertion versus deletion
+    
 } dwgsim_opt_t;
 
 dwgsim_opt_t* 

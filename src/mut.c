@@ -298,7 +298,7 @@ void mut_add_ins(dwgsim_opt_t *opt, mutseq_t *hap1, mutseq_t *hap2, int32_t i, i
 
   if (hap < 0) {
       // set ploidy
-      if (opt->is_hap || drand48() < 0.333333) { // hom-ins
+      if (opt->is_hap || drand48() < 1.0 - opt->ins_het) { // hom-ins
           hap = 3;
       } else if (drand48() < 0.5) {
           hap = 1;
@@ -614,14 +614,14 @@ void mut_diref(dwgsim_opt_t *opt, const seq_t *seq, mutseq_t *hap1, mutseq_t *ha
               if (drand48() >= opt->indel_frac) { // substitution
                   double r = drand48();
                   c = (c + (mut_t)(r * 3.0 + 1)) & 3;
-                  if (opt->is_hap || drand48() < 0.333333) { // hom
+                  if (opt->is_hap || drand48() < 1.0 - opt->sub_het) { // hom
                       ret[0]->s[i] = ret[1]->s[i] = SUBSTITUTE|c;
                   } else { // het
                       ret[drand48()<0.5?0:1]->s[i] = SUBSTITUTE|c;
                   }
               } else { // indel
-                  if (drand48() < 0.5) { // deletion
-                      if (opt->is_hap || drand48() < 0.3333333) { // hom-del
+                  if (drand48() < opt->del_prob) { // deletion
+                      if (opt->is_hap || drand48() < 1.0 - opt->del_het) { // hom-del
                           ret[0]->s[i] = ret[1]->s[i] = DELETE|c;
                           deleting = 3;
                       } else { // het-del
@@ -762,7 +762,7 @@ void mut_print_header_post(FILE *fpout_vcf)
   fprintf(fpout_vcf, "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele Frequency\">\n");
   fprintf(fpout_vcf, "##INFO=<ID=pl,Number=1,Type=Integer,Description=\"Phasing: 1 - HET contig 1, #2 - HET contig #2, 3 - HOM both contigs\">\n"); 
   fprintf(fpout_vcf, "##INFO=<ID=mt,Number=1,Type=String,Description=\"Variant Type: SUBSTITUTE/INSERT/DELETE\">\n");
-  fprintf(fpout_vcf, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n");
+  fprintf(fpout_vcf, "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE\n"); 
 }
 
 void mut_print_header_contig(FILE *fpout_vcf, const char *name, int32_t length)
@@ -790,7 +790,7 @@ void mut_print(const char *name, const seq_t *seq, mutseq_t *hap1, mutseq_t *hap
           if ((c[1] & mut_and_type_mask) == (c[2] & mut_and_type_mask)) { // hom
               if ((c[1]&mutmsk) == SUBSTITUTE) { // substitution
                   fprintf(fpout_txt, "%c\t%c\t3\n", "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
-                  fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c\t100\tPASS\tAF=1.0;pl=3;mt=SUBSTITUTE\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
+                  fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c\t100\tPASS\tAF=1.0;pl=3;mt=SUBSTITUTE\tGT\t1|1\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]); 
               } else if ((c[1]&mutmsk) == DELETE) { // del
                   fprintf(fpout_txt, "%c\t-\t3\n", "ACGTN"[c[0]]);
                   if(0 == mut_prev[0] || 0 == mut_prev[1]) {
@@ -806,7 +806,7 @@ void mut_print(const char *name, const seq_t *seq, mutseq_t *hap1, mutseq_t *hap
                       }
                       if (0 < i) fprintf(fpout_vcf, "\t%c", "ACGTN"[nst_nt4_table[(int)seq->s[i-1]]]);
                       else fprintf(fpout_vcf, "\t.");
-                      fprintf(fpout_vcf, "\t100\tPASS\tAF=1.0;pl=3;mt=DELETE\n"); 
+                      fprintf(fpout_vcf, "\t100\tPASS\tAF=1.0;pl=3;mt=DELETE\tGT\t1|1\n"); 
                   }
                   // NB: convert back 'c'
                   c[0] = nst_nt4_table[(int)seq->s[i]];
@@ -817,14 +817,14 @@ void mut_print(const char *name, const seq_t *seq, mutseq_t *hap1, mutseq_t *hap
                   fprintf(fpout_txt, "\t3\n");
                   fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[0]]);
                   mut_print_ins(fpout_vcf, hap1, i);
-                  fprintf(fpout_vcf, "\t100\tPASS\tAF=1.0;pl=3;mt=INSERT\n");
+                  fprintf(fpout_vcf, "\t100\tPASS\tAF=1.0;pl=3;mt=INSERT\tGT\t1|1\n");
               }  else assert(0);
           } else { // het
               if ((c[1]&mutmsk) == SUBSTITUTE || (c[2]&mutmsk) == SUBSTITUTE) { // substitution
                   hap = ((c[1]&mutmsk) == SUBSTITUTE) ? 1 : 2;
                   fprintf(fpout_txt, "%c\t%c\t%d\n", "ACGTN"[c[0]], "XACMGRSVTWYHKDBN"[1<<(c[1]&0x3)|1<<(c[2]&0x3)], hap);
-                  if(1 == hap) fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c\t100\tPASS\tAF=0.5;pl=1;mt=SUBSTITUTE\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]);
-                  else fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c\t100\tPASS\tAF=0.5;pl=2;mt=SUBSTITUTE\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[2]&0xf]);
+                  if(1 == hap) fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c\t100\tPASS\tAF=0.5;pl=1;mt=SUBSTITUTE\tGT\t1|0\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[1]&0xf]); 
+                  else fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c\t100\tPASS\tAF=0.5;pl=2;mt=SUBSTITUTE\tGT\t0|1\n", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[2]&0xf]); 
               } else if ((c[1]&mutmsk) == DELETE) {
                   fprintf(fpout_txt, "%c\t-\t1\n", "ACGTN"[c[0]]);
                   if(0 == mut_prev[0]) {
@@ -840,7 +840,7 @@ void mut_print(const char *name, const seq_t *seq, mutseq_t *hap1, mutseq_t *hap
                       }
                       if (0 < i) fprintf(fpout_vcf, "\t%c", "ACGTN"[nst_nt4_table[(int)seq->s[i-1]]]);
                       else fprintf(fpout_vcf, "\t.");
-                      fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=1;mt=DELETE\n"); 
+                      fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=1;mt=DELETE\tGT\t1|0\n");  
                   }
                   // NB: convert back 'c'
                   c[0] = nst_nt4_table[(int)seq->s[i]];
@@ -860,7 +860,7 @@ void mut_print(const char *name, const seq_t *seq, mutseq_t *hap1, mutseq_t *hap
                       }
                       if (0 < i) fprintf(fpout_vcf, "\t%c", "ACGTN"[nst_nt4_table[(int)seq->s[i-1]]]);
                       else fprintf(fpout_vcf, "\t.");
-                      fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=2;mt=DELETE\n"); 
+                      fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=2;mt=DELETE\tGT\t0|1\n"); 
                   }
                   // NB: convert back 'c'
                   c[0] = nst_nt4_table[(int)seq->s[i]];
@@ -871,14 +871,14 @@ void mut_print(const char *name, const seq_t *seq, mutseq_t *hap1, mutseq_t *hap
                   fprintf(fpout_txt, "\t1\n");
                   fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[0]]);
                   mut_print_ins(fpout_vcf, hap1, i);
-                  fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=1;mt=INSERT\n");
+                  fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=1;mt=INSERT\tGT\t1|0\n"); 
               } else if ((c[2]&mutmsk) == INSERT) { // ins 2
                   fprintf(fpout_txt, "-\t");
                   mut_print_ins(fpout_txt, hap2, i);
                   fprintf(fpout_txt, "\t2\n");
                   fprintf(fpout_vcf, "%s\t%d\t.\t%c\t%c", name, i+1, "ACGTN"[c[0]], "ACGTN"[c[0]]);
                   mut_print_ins(fpout_vcf, hap2, i);
-                  fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=2;mt=INSERT\n");
+                  fprintf(fpout_vcf, "\t100\tPASS\tAF=0.5;pl=2;mt=INSERT\tGT\t0|1\n"); 
               } else assert(0);
           }
       }
